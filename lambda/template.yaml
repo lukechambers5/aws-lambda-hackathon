@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  LegoPriceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LegoPriceLambda
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Code:
+        S3Bucket: your-bucket-name
+        S3Key: lambda/handler.zip
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          TABLE_NAME: LegoPrices
+      Policies:
+        - AmazonDynamoDBReadOnlyAccess
