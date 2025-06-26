@@ -1,78 +1,106 @@
+# LEGO Price Tracker (AWS Lambda Hackathon)
 
-# 🧱 LEGO Price Generator – AWS Lambda Hackathon Project
+This project tracks LEGO set prices using AWS Lambda, DynamoDB, API Gateway, and a Next.js frontend. It checks a cached price first in DynamoDB, and if not found, fetches live data from the BrickEconomy API and stores it for future use.
 
-This is a full-stack price suggestion tool for LEGO sets based on condition and set number, using:
+---
 
-- **AWS Lambda** (serverless price logic)
-- **API Gateway** (secure endpoint)
-- **DynamoDB** (price samples per set)
-- **Next.js API Route** (frontend/backend bridge)
+## Live Demo
 
-## 💡 How it works
+> (Add your frontend deployment URL here, e.g., `https://lego-prices.vercel.app`)
 
-1. A user enters a LEGO set number and condition (`new` or `used`).
-2. The request hits an AWS API Gateway URL which triggers a Lambda function.
-3. The Lambda reads price samples from DynamoDB.
-4. If no price samples exist, a fallback price is estimated based on retail value.
+---
 
-## 🗃️ DynamoDB Schema
+## AWS Services Used
 
-Each item has:
-- `set_num`: string (partition key)
-- `condition`: string (`new` or `used`)
-- `price_samples`: list of numbers (e.g. `[{"N":"150"},{"N":"160"}]`)
+| Service              | Purpose                                                                 |
+|----------------------|-------------------------------------------------------------------------|
+| **AWS Lambda**        | Serverless backend to check and store prices in DynamoDB               |
+| **Amazon DynamoDB**   | NoSQL database for storing LEGO price samples                          |
+| **Amazon API Gateway**| Public endpoint to trigger Lambda using a POST request                 |
+| **IAM Roles**         | Grants Lambda permission to read/write from DynamoDB                   |
+| **CloudWatch Logs**   | Debugging and monitoring Lambda execution and errors                   |
 
-## 📦 Lambda Function Sample
+---
 
-```js
-// lambda/handler.js
-const AWS = require('aws-sdk');
-const docClient = new AWS.DynamoDB.DocumentClient();
+## Overview
 
-exports.handler = async (event) => {
-  const { set_num, condition } = JSON.parse(event.body);
-  const params = {
-    TableName: 'LegoPrices',
-    Key: { set_num, condition }
-  };
+1. User enters a LEGO set number and condition (new/used)
+2. `/api/check-price` (Next.js API route) sends a POST to the AWS Lambda endpoint
+3. **Lambda flow:**
+   - Checks DynamoDB for `set_num + condition`
+   - If found: returns cached price
+   - If not found: `/api/check-price` uses `retail_fallback.ts` to call BrickEconomy API
+   - Stores the new price into DynamoDB via another call to the same Lambda
+4. The result is shown to the user with name, year, and latest price
 
-  try {
-    const data = await docClient.get(params).promise();
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ data: data.Item || {} }),
-    };
-  } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch data' }),
-    };
-  }
-};
-```
 
-## 🔁 Fallback Logic
+---
 
-If price samples are missing, fallback prices are:
-- `new` → `retail * 1.1`
-- `used` → `retail * 0.6`
+## Lambda Deep Dive
 
-Defined in `get_retail_value()`.
+- The function receives an HTTP POST request via **API Gateway**
+- The request must include a `set_num` and `condition`
+- If `store: true` is included:
+  - It will expect additional fields (`name`, `year`, `price_samples`)
+  - Stores the price data in **DynamoDB**
+- If `store` is not set or false:
+  - It will **retrieve** the existing price data from DynamoDB and return it to the client
 
-## 🚀 Deployment
 
-This repo includes:
-- Your frontend-facing API route
-- A placeholder Lambda function
-- Sample data for DynamoDB
+---
 
-## 📌 Example Request
+## Example Input (Fetch)
 
-```ts
-POST /api/check-price
+```json
 {
-  "set_num": "75257",
-  "condition": "new",
-  "sell_method": "auction"
+  "set_num": "10236-1",
+  "condition": "new"
 }
 ```
+
+
+---
+
+## Example Output (Found)
+```json
+{
+  "message": "Price found",
+  "data": {
+    "set_num": "10236-1",
+    "condition": "new",
+    "name": "Ewok Village",
+    "year": 2013,
+    "price_samples": [
+      { "source": "BrickEconomy", "value": 450 }
+    ]
+  }
+}
+```
+
+
+---
+
+## Example Output (Not Found)
+```json
+{
+  "message": "No price data available for this set."
+}
+```
+
+
+---
+
+## Tech Stack
+
+### Frontend
+- **Next.js (React)**
+- API route: `/api/check-price`
+- User interface: `/index.tsx` page with clean inputs and result
+
+### Backend
+- **AWS Lambda** (Python)
+- **DynamoDB** with partition key `set_num` and sort key `condition`
+- **API Gateway** to expose Lambda securely
+- **Node.js API route** to orchestrate logic
+
+---
