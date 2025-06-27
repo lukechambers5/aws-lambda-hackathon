@@ -6,7 +6,7 @@ This project tracks LEGO set prices using AWS Lambda, DynamoDB, API Gateway, and
 
 ## Live Demo
 
-> [Check out our Live Demo here!](https://aws-lambda-hackathon.vercel.app/)
+> [Check out Live Demo here!](https://aws-lambda-hackathon.vercel.app/)
 
 ---
 
